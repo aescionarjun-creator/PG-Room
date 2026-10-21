@@ -20,6 +20,14 @@ import {
   Mail,
   Home,
 } from "lucide-react";
+export async function generateStaticParams() {
+  try {
+    const bookings = await prisma.booking.findMany({ select: { id: true } });
+    return bookings.map((b) => ({ id: b.id }));
+  } catch {
+    return [];
+  }
+}
 
 export default async function BookingConfirmationPage({
   params,

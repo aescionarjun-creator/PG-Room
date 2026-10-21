@@ -5,6 +5,16 @@ import { DemoBanner } from "@/components/common/DemoBanner";
 import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
 import { RoomDetailsClient } from "./RoomDetailsClient";
+export async function generateStaticParams() {
+  try {
+    const rooms = await prisma.roomType.findMany({
+      select: { slug: true },
+    });
+    return rooms.map((r) => ({ slug: r.slug }));
+  } catch {
+    return [];
+  }
+}
 
 export default async function RoomDetailsPage({
   params,
