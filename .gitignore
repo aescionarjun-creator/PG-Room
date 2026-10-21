@@ -42,6 +42,11 @@ prisma/dev.db
 # vercel
 .vercel
 
+# firebase
+.firebase
+firebase-debug*.log
+firebase-debug*
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
