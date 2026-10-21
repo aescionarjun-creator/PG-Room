@@ -1,0 +1,286 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  name           String
+  phone          String?
+  role           String          @default("CUSTOMER") // CUSTOMER, ADMIN
+  passwordHash   String?
+  bookings       Booking[]
+  visitRequests  VisitRequest[]
+  supportTickets SupportTicket[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Property {
+  id            String         @id @default(cuid())
+  name          String
+  slug          String         @unique
+  tagline       String?
+  description   String
+  address       String
+  city          String
+  state         String
+  pincode       String
+  contactPhone  String
+  contactEmail  String
+  rules         String?
+  checkInTime   String         @default("12:00 PM")
+  checkOutTime  String         @default("11:00 AM")
+  timezone      String         @default("Asia/Kolkata")
+  coverImage    String
+  images        String         // JSON array of image URLs
+  roomTypes     RoomType[]
+  bookings      Booking[]
+  visitRequests VisitRequest[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model RoomType {
+  id             String          @id @default(cuid())
+  propertyId     String
+  property       Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String          @unique
+  category       String          // PRIVATE, TWIN_SHARING, TRIPLE_SHARING
+  description    String
+  sizeSqFt       Int             @default(180)
+  baseCapacity   Int             @default(1)
+  maxCapacity    Int             @default(1)
+  hasAc          Boolean         @default(true)
+  bathroomType   String          @default("ATTACHED") // ATTACHED, COMMON
+  foodIncluded   Boolean         @default(false)
+  foodDetails    String?
+  keyAmenities   String          // JSON array of strings
+  images         String          // JSON array of image URLs
+  rooms          Room[]
+  ratePlans      RatePlan[]
+  bookings       Booking[]
+  inventoryHolds InventoryHold[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Room {
+  id             String          @id @default(cuid())
+  roomTypeId     String
+  roomType       RoomType        @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  roomNumber     String
+  floor          Int             @default(1)
+  status         String          @default("ACTIVE") // ACTIVE, MAINTENANCE
+  inventoryUnits InventoryUnit[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model InventoryUnit {
+  id                 String              @id @default(cuid())
+  roomId             String
+  room               Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  identifier         String              // e.g. "Room 101" or "Bed A"
+  isBed              Boolean             @default(false)
+  status             String              @default("AVAILABLE") // AVAILABLE, MAINTENANCE, BLOCKED
+  bookings           Booking[]
+  bookingItems       BookingItem[]
+  availabilityBlocks AvailabilityBlock[]
+  inventoryHolds     InventoryHold[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model RatePlan {
+  id                String   @id @default(cuid())
+  roomTypeId        String
+  roomType          RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  durationType      String   // HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
+  price             Float
+  isEnabled         Boolean  @default(true)
+  minDuration       Int      @default(1)
+  maxDuration       Int?
+  allowedHoursStart String?  @default("08:00")
+  allowedHoursEnd   String?  @default("22:00")
+  depositAmount     Float    @default(0)
+  foodMonthlyCharge Float?   @default(0)
+  electricityRule   String?  @default("Included in rent")
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([roomTypeId, durationType])
+}
+
+model Booking {
+  id                      String            @id @default(cuid())
+  bookingReference        String            @unique
+  userId                  String?
+  user                    User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  propertyId              String
+  property                Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  roomTypeId              String
+  roomType                RoomType          @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  inventoryUnitId         String?
+  inventoryUnit           InventoryUnit?    @relation(fields: [inventoryUnitId], references: [id], onDelete: SetNull)
+  durationType            String            // HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
+  startTime               DateTime
+  endTime                 DateTime
+  durationCount           Int               // e.g. 4 (hours), 3 (days), 2 (weeks), 1 (month), 12 (months)
+  guestCount              Int               @default(1)
+  guestName               String
+  guestEmail              String
+  guestPhone              String
+  specialRequests         String?
+  basePrice               Float
+  foodCharges             Float             @default(0)
+  taxes                   Float             @default(0)
+  depositAmount           Float             @default(0)
+  totalAmount             Float
+  payableNow              Float
+  balanceRemaining        Float             @default(0)
+  status                  String            @default("CONFIRMED") // PENDING, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED
+  paymentStatus           String            @default("PAID") // UNPAID, HELD, PAID, REFUNDED, PARTIALLY_REFUNDED
+  cancellationReason      String?
+  cancellationRequestedAt DateTime?
+  notes                   String?
+  bookingItems            BookingItem[]
+  payments                Payment[]
+  paymentSchedules        PaymentSchedule[]
+  refunds                 Refund[]
+  supportTickets          SupportTicket[]
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+}
+
+model BookingItem {
+  id              String        @id @default(cuid())
+  bookingId       String
+  booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  inventoryUnitId String
+  inventoryUnit   InventoryUnit @relation(fields: [inventoryUnitId], references: [id], onDelete: Restrict)
+  startTime       DateTime
+  endTime         DateTime
+  createdAt       DateTime      @default(now())
+}
+
+model InventoryHold {
+  id              String         @id @default(cuid())
+  token           String         @unique
+  roomTypeId      String
+  roomType        RoomType       @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  inventoryUnitId String?
+  inventoryUnit   InventoryUnit? @relation(fields: [inventoryUnitId], references: [id], onDelete: SetNull)
+  durationType    String
+  startTime       DateTime
+  endTime         DateTime
+  expiresAt       DateTime
+  guestEmail      String?
+  createdAt       DateTime       @default(now())
+}
+
+model Payment {
+  id               String    @id @default(cuid())
+  bookingId        String
+  booking          Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount           Float
+  currency         String    @default("INR")
+  status           String    @default("SUCCESS") // PENDING, SUCCESS, FAILED, REFUNDED
+  provider         String    @default("DEMO_ADAPTER") // DEMO_ADAPTER, RAZORPAY, STRIPE, MANUAL_OFFLINE
+  transactionRef   String
+  webhookSignature String?
+  isDemo           Boolean   @default(true)
+  paidAt           DateTime? @default(now())
+  createdAt        DateTime  @default(now())
+}
+
+model PaymentSchedule {
+  id          String    @id @default(cuid())
+  bookingId   String
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  dueDate     DateTime
+  amount      Float
+  description String
+  status      String    @default("PENDING") // PENDING, PAID
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Refund {
+  id          String    @id @default(cuid())
+  bookingId   String
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  paymentId   String?
+  amount      Float
+  reason      String
+  status      String    @default("REQUESTED") // REQUESTED, PROCESSED, REJECTED
+  requestedAt DateTime  @default(now())
+  processedAt DateTime?
+}
+
+model AvailabilityBlock {
+  id              String        @id @default(cuid())
+  inventoryUnitId String
+  inventoryUnit   InventoryUnit @relation(fields: [inventoryUnitId], references: [id], onDelete: Cascade)
+  reason          String        // MAINTENANCE, CLEANING, OFFLINE_HOLD
+  startTime       DateTime
+  endTime         DateTime
+  notes           String?
+  createdAt       DateTime      @default(now())
+}
+
+model VisitRequest {
+  id            String    @id @default(cuid())
+  propertyId    String
+  property      Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerName  String
+  customerPhone String
+  customerEmail String
+  preferredDate DateTime
+  timeSlot      String
+  status        String    @default("SCHEDULED") // SCHEDULED, CONFIRMED, COMPLETED, CANCELLED
+  notes         String?
+  createdAt     DateTime  @default(now())
+}
+
+model SupportTicket {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingId  String?
+  booking    Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  category   String    // MAINTENANCE, HOUSEKEEPING, PAYMENT, GENERAL
+  subject    String
+  message    String
+  status     String    @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED
+  adminReply String?
+  repliedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model SiteContent {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  adminEmail String?
+  action     String
+  entityType String
+  entityId   String?
+  details    String?
+  createdAt  DateTime @default(now())
+}
