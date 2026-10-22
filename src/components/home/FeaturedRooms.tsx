@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import prisma from "@/lib/prisma";
 
-export async function FeaturedRooms() {
-  const roomTypes = await prisma.roomType.findMany({
+async function getFeaturedRoomTypes() {
+  return await prisma.roomType.findMany({
     take: 9,
     orderBy: { createdAt: "asc" },
     include: {
@@ -33,6 +33,18 @@ export async function FeaturedRooms() {
       },
     },
   });
+}
+
+type FeaturedRoomType = Awaited<ReturnType<typeof getFeaturedRoomTypes>>[number];
+
+export async function FeaturedRooms() {
+  let roomTypes: FeaturedRoomType[] = [];
+  try {
+    roomTypes = await getFeaturedRoomTypes();
+  } catch (error) {
+    console.error("FeaturedRooms error loading room types:", error);
+    roomTypes = [];
+  }
 
   return (
     <section className="py-24 bg-[#F8F7F2]">
